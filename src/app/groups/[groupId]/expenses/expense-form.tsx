@@ -873,6 +873,7 @@ export function ExpenseForm({
                 <FormItem className="sm:order-2">
                   <FormLabel>{t('categoryField.label')}</FormLabel>
                   <CategorySelector
+                    groupId={group.id}
                     categories={categories}
                     defaultValue={
                       form.watch(field.name) as number // may be overwritten externally

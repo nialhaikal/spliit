@@ -22,6 +22,7 @@ model Group {
   participants Participant[]
   expenses     Expense[]
   activities   Activity[]
+  categories   Category[]
   createdAt    DateTime      @default(now())
   deleteAt     DateTime?
 }
@@ -39,7 +40,13 @@ model Category {
   id       Int       @id @default(autoincrement())
   grouping String
   name     String
+  // Null for the built-in categories shared by every group. Set for a custom
+  // category, which only its group can see and use.
+  group    Group?    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId  String?
   Expense  Expense[]
+
+  @@index([groupId])
 }
 
 model Expense {
@@ -47,7 +54,10 @@ model Expense {
   group            Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
   expenseDate      DateTime          @default(dbgenerated("CURRENT_DATE")) @db.Date
   title            String
-  category         Category?         @relation(fields: [categoryId], references: [id])
+  // NoAction rather than Restrict: deleting a group removes its expenses and
+  // its custom categories in the same statement, and only NoAction waits for
+  // the end of it to check that no expense still points at a category.
+  category         Category?         @relation(fields: [categoryId], references: [id], onDelete: NoAction)
   categoryId       Int               @default(0)
   amount           Int
   originalAmount   Int?

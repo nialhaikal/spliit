@@ -510,6 +510,11 @@
   "Categories": {
     "search": "Search category...",
     "noCategory": "No category found.",
+    "create": "Create “{name}”",
+    "CreateErrorToast": {
+      "title": "Could not create the category",
+      "description": "Something went wrong while creating the category. Please try again."
+    },
     "Uncategorized": {
       "heading": "Uncategorized",
       "General": "General",
@@ -574,6 +579,9 @@
       "Trash": "Trash",
       "TV/Phone/Internet": "TV/Phone/Internet",
       "Water": "Water"
+    },
+    "Custom": {
+      "heading": "Custom"
     }
   },
   "Currencies": {

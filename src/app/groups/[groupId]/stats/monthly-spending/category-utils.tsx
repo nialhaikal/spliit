@@ -8,7 +8,11 @@ import {
   MonthlySpendingGrouping,
   MonthlySpendingMonth,
 } from '@/lib/monthly-spending'
-import { formatCurrency } from '@/lib/utils'
+import {
+  CUSTOM_CATEGORY_GROUPING,
+  formatCurrency,
+  getCategoryName,
+} from '@/lib/utils'
 import {
   Banknote,
   Bus,
@@ -16,6 +20,7 @@ import {
   HandHelping,
   Home,
   PlugZap,
+  Tag,
   Utensils,
 } from 'lucide-react'
 
@@ -73,6 +78,8 @@ function CategoryGroupIcon({
       return <Bus className={className} />
     case 'Utilities':
       return <PlugZap className={className} />
+    case CUSTOM_CATEGORY_GROUPING:
+      return <Tag className={className} />
     default:
       return <Banknote className={className} />
   }
@@ -87,7 +94,7 @@ export function getCategoryLabel(
     return tCategories(`${category.grouping}.heading`)
   }
 
-  return tCategories(`${category.grouping}.${category.name}`)
+  return getCategoryName(category, tCategories)
 }
 
 export function getCategoryHoverLabel({

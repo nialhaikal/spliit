@@ -1,4 +1,9 @@
-import { getGroupExpenses, updateExpense } from './api'
+import {
+  createCategory,
+  getCategories,
+  getGroupExpenses,
+  updateExpense,
+} from './api'
 import { prisma } from './prisma'
 import { ExpenseFormValues } from './schemas'
 
@@ -6,6 +11,7 @@ jest.mock('./prisma', () => ({
   prisma: {
     $transaction: jest.fn(),
     activity: { create: jest.fn() },
+    category: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn() },
     expense: { findMany: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
     group: { findUnique: jest.fn() },
     recurringExpenseLink: { findMany: jest.fn() },
@@ -260,6 +266,7 @@ describe('updateExpense', () => {
     jest
       .mocked(prisma.expense.findUnique)
       .mockResolvedValue(existingExpense as never)
+    jest.mocked(prisma.category.findFirst).mockResolvedValue({ id: 0 } as never)
     await updateExpense('group-1', 'expense-1', values)
     return jest.mocked(prisma.expense.update).mock.calls[0][0].data
       .recurringExpenseLink
@@ -314,5 +321,82 @@ describe('updateExpense', () => {
       nextExpenseDate: new Date(Date.UTC(2025, 0, 22)),
       anchorDay: null,
     })
+  })
+})
+
+describe('custom categories', () => {
+  beforeEach(() => jest.clearAllMocks())
+
+  it('lists only built-in categories without a group', async () => {
+    await getCategories()
+
+    expect(prisma.category.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { OR: [{ groupId: null }] } }),
+    )
+  })
+
+  it("lists the group's own categories next to the built-in ones", async () => {
+    await getCategories('group-1')
+
+    expect(prisma.category.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { OR: [{ groupId: null }, { groupId: 'group-1' }] },
+      }),
+    )
+  })
+
+  it('creates a custom category under the custom grouping', async () => {
+    jest
+      .mocked(prisma.group.findUnique)
+      .mockResolvedValue({ id: 'group-1', participants: [] } as never)
+    jest.mocked(prisma.category.findFirst).mockResolvedValue(null)
+
+    await createCategory('group-1', 'Coffee')
+
+    expect(prisma.category.create).toHaveBeenCalledWith({
+      data: { groupId: 'group-1', grouping: 'Custom', name: 'Coffee' },
+    })
+  })
+
+  it('returns the existing category instead of a duplicate', async () => {
+    const existing = {
+      id: 50,
+      groupId: 'group-1',
+      grouping: 'Custom',
+      name: 'Coffee',
+    }
+    jest
+      .mocked(prisma.group.findUnique)
+      .mockResolvedValue({ id: 'group-1', participants: [] } as never)
+    jest.mocked(prisma.category.findFirst).mockResolvedValue(existing as never)
+
+    await expect(createCategory('group-1', 'coffee')).resolves.toBe(existing)
+    expect(prisma.category.create).not.toHaveBeenCalled()
+  })
+
+  it("rejects an expense using another group's category", async () => {
+    jest.mocked(prisma.group.findUnique).mockResolvedValue({
+      id: 'group-1',
+      participants: [{ id: 'participant-1' }],
+    } as never)
+    jest
+      .mocked(prisma.expense.findUnique)
+      .mockResolvedValue({ id: 'expense-1' } as never)
+    jest.mocked(prisma.category.findFirst).mockResolvedValue(null)
+
+    await expect(
+      updateExpense('group-1', 'expense-1', {
+        title: 'Coffee',
+        category: 50,
+        paidBy: 'participant-1',
+        paidFor: [{ participant: 'participant-1', shares: 1 }],
+      } as ExpenseFormValues),
+    ).rejects.toThrow('Invalid category ID: 50')
+    expect(prisma.category.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 50, OR: [{ groupId: null }, { groupId: 'group-1' }] },
+      }),
+    )
+    expect(prisma.expense.update).not.toHaveBeenCalled()
   })
 })

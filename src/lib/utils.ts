@@ -58,6 +58,26 @@ export function formatDateOnly(
   })
 }
 
+/**
+ * The grouping every custom category is stored under. No built-in category
+ * uses it, so it tells a custom category apart from its grouping alone.
+ */
+export const CUSTOM_CATEGORY_GROUPING = 'Custom'
+
+export const CUSTOM_CATEGORY_NAME_MAX_LENGTH = 50
+
+/**
+ * Display name of a category. Built-in names are translation keys; a custom
+ * category's name is whatever the group typed, shown as is.
+ */
+export function getCategoryName(
+  category: Pick<Category, 'grouping' | 'name'>,
+  tCategories: (key: string) => string,
+) {
+  if (category.grouping === CUSTOM_CATEGORY_GROUPING) return category.name
+  return tCategories(`${category.grouping}.${category.name}`)
+}
+
 export function formatCategoryForAIPrompt(category: Category) {
   return `"${category.grouping}/${category.name}" (ID: ${category.id})`
 }

@@ -14,13 +14,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { useToast } from '@/components/ui/use-toast'
 import { Category } from '@/generated/prisma/browser'
 import { useMediaQuery } from '@/lib/hooks'
-import { ChevronDown, Loader2 } from 'lucide-react'
+import { CUSTOM_CATEGORY_NAME_MAX_LENGTH, getCategoryName } from '@/lib/utils'
+import { trpc } from '@/trpc/client'
+import { ChevronDown, Loader2, Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { forwardRef, useEffect, useState } from 'react'
 
 type Props = {
+  /** Group a category created from the search field is added to. */
+  groupId: string
   categories: Category[]
   onValueChange: (categoryId: Category['id']) => void
   /** Category ID to be selected by default. Overwriting this value will update current selection, too. */
@@ -29,6 +34,7 @@ type Props = {
 }
 
 export function CategorySelector({
+  groupId,
   categories,
   onValueChange,
   defaultValue,
@@ -59,6 +65,7 @@ export function CategorySelector({
         </PopoverTrigger>
         <PopoverContent className="p-0" align="start">
           <CategoryCommand
+            groupId={groupId}
             categories={categories}
             onValueChange={(id) => {
               setValue(id)
@@ -82,6 +89,7 @@ export function CategorySelector({
       </DrawerTrigger>
       <DrawerContent className="p-0">
         <CategoryCommand
+          groupId={groupId}
           categories={categories}
           onValueChange={(id) => {
             setValue(id)
@@ -95,13 +103,21 @@ export function CategorySelector({
 }
 
 function CategoryCommand({
+  groupId,
   categories,
   onValueChange,
 }: {
+  groupId: string
   categories: Category[]
   onValueChange: (categoryId: Category['id']) => void
 }) {
   const t = useTranslations('Categories')
+  const { toast } = useToast()
+  const utils = trpc.useUtils()
+  const { mutateAsync: createCategory, isPending: isCreating } =
+    trpc.categories.create.useMutation()
+  const [search, setSearch] = useState('')
+
   const categoriesByGroup = categories.reduce<Record<string, Category[]>>(
     (acc, category) => ({
       ...acc,
@@ -110,11 +126,72 @@ function CategoryCommand({
     {},
   )
 
+  // Offer to create a category from the search text, unless one already has
+  // that name.
+  const newCategoryName = search.trim()
+  const canCreate =
+    newCategoryName !== '' &&
+    !categories.some(
+      (category) =>
+        getCategoryName(category, t).toLocaleLowerCase() ===
+        newCategoryName.toLocaleLowerCase(),
+    )
+
+  async function handleCreate() {
+    if (isCreating) return
+    try {
+      const { category } = await createCategory({
+        groupId,
+        name: newCategoryName,
+      })
+      // Add it to the cached list right away so the selector can show it as
+      // selected without waiting for a refetch.
+      utils.categories.list.setData({ groupId }, (data) =>
+        data && !data.categories.some(({ id }) => id === category.id)
+          ? { categories: [...data.categories, category] }
+          : data,
+      )
+      setSearch('')
+      onValueChange(category.id)
+    } catch {
+      toast({
+        title: t('CreateErrorToast.title'),
+        description: t('CreateErrorToast.description'),
+        variant: 'destructive',
+      })
+    }
+  }
+
   return (
     <Command>
-      <CommandInput placeholder={t('search')} className="text-base" />
+      <CommandInput
+        placeholder={t('search')}
+        className="text-base"
+        value={search}
+        onValueChange={setSearch}
+        maxLength={CUSTOM_CATEGORY_NAME_MAX_LENGTH}
+      />
       <CommandList>
-        <CommandEmpty>{t('noCategory')}</CommandEmpty>
+        {!canCreate && <CommandEmpty>{t('noCategory')}</CommandEmpty>}
+        {canCreate && (
+          <CommandGroup forceMount>
+            <CommandItem
+              forceMount
+              value={`create ${newCategoryName}`}
+              disabled={isCreating}
+              onSelect={handleCreate}
+            >
+              <div className="flex items-center gap-3">
+                {isCreating ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                {t('create', { name: newCategoryName })}
+              </div>
+            </CommandItem>
+          </CommandGroup>
+        )}
         {Object.entries(categoriesByGroup).map(
           ([group, groupCategories], index) => (
             <CommandGroup key={index} heading={t(`${group}.heading`)}>
@@ -123,7 +200,7 @@ function CategoryCommand({
                   key={category.id}
                   value={`${category.id} ${t(
                     `${category.grouping}.heading`,
-                  )} ${t(`${category.grouping}.${category.name}`)}`}
+                  )} ${getCategoryName(category, t)}`}
                   onSelect={(currentValue) => {
                     const id = Number(currentValue.split(' ')[0])
                     onValueChange(id)
@@ -177,7 +254,7 @@ function CategoryLabel({ category }: { category: Category }) {
   return (
     <div className="flex items-center gap-3">
       <CategoryIcon category={category} className="w-4 h-4" />
-      {t(`${category.grouping}.${category.name}`)}
+      {getCategoryName(category, t)}
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { Category } from '@/generated/prisma/browser'
+import { CUSTOM_CATEGORY_GROUPING } from '@/lib/utils'
 import {
   Armchair,
   Baby,
@@ -35,6 +36,7 @@ import {
   Shirt,
   ShoppingCart,
   Stethoscope,
+  Tag,
   ThermometerSun,
   Train,
   Trash,
@@ -46,13 +48,16 @@ import {
 export function CategoryIcon({
   category,
   ...props
-}: { category: Category | null } & LucideProps) {
+}: {
+  category: Pick<Category, 'id' | 'grouping' | 'name'> | null
+} & LucideProps) {
   const Icon = getCategoryIcon(`${category?.grouping}/${category?.name}`)
   // eslint-disable-next-line react-hooks/static-components
   return <Icon {...props} />
 }
 
 function getCategoryIcon(category: string): LucideIcon {
+  if (category.startsWith(`${CUSTOM_CATEGORY_GROUPING}/`)) return Tag
   switch (category) {
     case 'Uncategorized/General':
       return Banknote

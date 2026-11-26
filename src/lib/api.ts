@@ -8,6 +8,7 @@ import { prisma } from '@/lib/prisma'
 import { randomId } from '@/lib/random'
 import { nextRecurringDate, usesAnchorDay } from '@/lib/recurrence'
 import { ExpenseFormValues, GroupFormValues } from '@/lib/schemas'
+import { CUSTOM_CATEGORY_GROUPING } from '@/lib/utils'
 
 // Re-exported for backwards compatibility with existing server-side importers.
 export { randomId }
@@ -52,6 +53,7 @@ export async function createExpense(
     if (!group.participants.some((p) => p.id === participant))
       throw new Error(`Invalid participant ID: ${participant}`)
   }
+  await assertCategoryAvailable(groupId, expenseFormValues.category)
 
   await logActivity(groupId, ActivityType.CREATE_EXPENSE, {
     participantId,
@@ -227,6 +229,7 @@ export async function updateExpense(
     if (!group.participants.some((p) => p.id === participant))
       throw new Error(`Invalid participant ID: ${participant}`)
   }
+  await assertCategoryAvailable(groupId, expenseFormValues.category)
 
   await logActivity(groupId, ActivityType.UPDATE_EXPENSE, {
     participantId,
@@ -403,8 +406,42 @@ export async function getGroup(groupId: string) {
   })
 }
 
-export async function getCategories() {
-  return prisma.category.findMany()
+/**
+ * The built-in categories, plus the custom ones of `groupId` when given.
+ * Without a group, no custom category is returned.
+ */
+export async function getCategories(groupId?: string) {
+  return prisma.category.findMany({
+    where: { OR: [{ groupId: null }, ...(groupId ? [{ groupId }] : [])] },
+    orderBy: { id: 'asc' },
+  })
+}
+
+/**
+ * Creates a custom category for the group, or returns the group's existing
+ * one with the same name (ignoring case) instead of adding a duplicate.
+ */
+export async function createCategory(groupId: string, name: string) {
+  const group = await getGroup(groupId)
+  if (!group) throw new Error(`Invalid group ID: ${groupId}`)
+
+  const existing = await prisma.category.findFirst({
+    where: { groupId, name: { equals: name, mode: 'insensitive' } },
+  })
+  if (existing) return existing
+
+  return prisma.category.create({
+    data: { groupId, grouping: CUSTOM_CATEGORY_GROUPING, name },
+  })
+}
+
+/** Rejects a category that is neither built-in nor one of the group's own. */
+async function assertCategoryAvailable(groupId: string, categoryId: number) {
+  const category = await prisma.category.findFirst({
+    where: { id: categoryId, OR: [{ groupId: null }, { groupId }] },
+    select: { id: true },
+  })
+  if (!category) throw new Error(`Invalid category ID: ${categoryId}`)
 }
 
 export async function getGroupExpenses(

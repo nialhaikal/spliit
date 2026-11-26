@@ -81,7 +81,7 @@ export function CreateFromReceiptButton() {
 function ReceiptDialogContent() {
   const { groupId, group } = useCurrentGroup()
   const sendEvent = useAnalytics()
-  const { data: categoriesData } = trpc.categories.list.useQuery()
+  const { data: categoriesData } = trpc.categories.list.useQuery({ groupId })
   const categories = categoriesData?.categories
 
   const locale = useLocale()

@@ -56,8 +56,18 @@ function splitExpense(
   } as Partial<Expense>)
 }
 
-const groceries = { id: 1, grouping: 'Food and Drink', name: 'Groceries' }
-const transport = { id: 2, grouping: 'Transportation', name: 'Car' }
+const groceries = {
+  id: 1,
+  grouping: 'Food and Drink',
+  name: 'Groceries',
+  groupId: null,
+}
+const transport = {
+  id: 2,
+  grouping: 'Transportation',
+  name: 'Car',
+  groupId: null,
+}
 
 /** A seeded LCG, so a failing case is reproducible from the seed alone. */
 function makeRandom(seed: number) {
