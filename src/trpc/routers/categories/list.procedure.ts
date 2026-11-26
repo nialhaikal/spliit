@@ -1,9 +1,13 @@
 import { getCategories } from '@/lib/api'
-import { baseProcedure } from '@/trpc/init'
+import { groupProcedure } from '@/trpc/init'
 import { z } from 'zod'
 
-export const listCategoriesProcedure = baseProcedure
-  .input(z.object({ groupId: z.string().min(1) }).optional())
-  .query(async ({ input }) => {
-    return { categories: await getCategories(input?.groupId) }
-  })
+/**
+ * The built-in categories plus the group's custom ones. Members only, since
+ * custom category names are group data.
+ */
+export const listCategoriesProcedure = groupProcedure(
+  z.object({ groupId: z.string().min(1) }),
+).query(async ({ input: { groupId } }) => {
+  return { categories: await getCategories(groupId) }
+})

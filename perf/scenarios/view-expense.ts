@@ -29,7 +29,7 @@ export const viewExpense: Step[] = [
     run: async () => {
       const [group, categories, expense] = await Promise.all([
         batched.groups.get.query({ groupId: id }),
-        batched.categories.list.query(),
+        batched.categories.list.query({ groupId: id }),
         batched.groups.expenses.get.query({ groupId: id, expenseId: target }),
       ])
       if (categories.categories.length === 0) {
